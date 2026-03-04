@@ -14,8 +14,7 @@ Projekt realizuje optyczny dekoder alfabetu Morse'a na płytce rozwojowej FRDM-K
 Układ został zrealizowany na platformie rozwojowej FRDM-KL05Z z mikrokontrolerem ARM Cortex-M0+. Interakcja z użytkownikiem odbywa się poprzez wyświetlacz LCD 2x16 sterowany układem HD44780U, który został podłączony do płytki poprzez 8-bitowy ekspander I2C, co zredukowało potrzebną liczbę połączeń sygnałowych. Rolę interfejsu wejściowego pełni moduł analogowego czujnika światła ALS-PT19 (oparty na fototranzystorze), podłączony do wejścia przetwornika ADC mikrokontrolera. Element ten umożliwia ciągły pomiar natężenia oświetlenia, co pozwala na detekcję impulsów świetlnych ze źródła światła oraz realizację procedury autokalibracji względem tła.
 
 Poniższy schemat ideowy ilustruje sposób integracji modułów zewnętrznych z płytką rozwojową:
-
-![Schemat ideowy układu](schemat.png)
+<img width="1259" height="703" alt="image" src="https://github.com/user-attachments/assets/9c4496d3-db70-44c6-b7cd-c31d79d9266e" />
 
 ## 3. Omówienie struktury i działania oprogramowania
 Architektura aplikacji opiera się na modelu pętli nieskończonej, w której program ciągle analizuje sygnał analogowy pochodzący z czujnika światła oraz interpretuje go jako sekwencje kodową. Działanie systemu można podzielić na trzy główne etapy:
