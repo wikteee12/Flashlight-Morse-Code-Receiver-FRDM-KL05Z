@@ -62,6 +62,11 @@ System został wyposażony w mechanizmy ciągłego monitorowania poprawności tr
 
 ### 5.1 Inicjalizacja licznika (`PIT_Init`)
 Funkcja konfiguruje licznik okresowy PIT do pełnienia roli systemowej podstawy czasu, generującej przerwania co 1 ms.
+Proces inicjalizacji rozpoczyna się od włączenia sygnału taktującego dla modułu w rejestrze SIM oraz wybudzenia go ze
+stanu uśpienia. Następnie do rejestru LDVAL wpisywana jest wartość obliczona na podstawie częstotliwości zegara
+magistrali (SystemCoreClock / 2) podzielonej przez 1000, co definiuje pożądany interwał czasowy. W końcowym etapie
+funkcja fizycznie uruchamia licznik, zezwala na zgłaszanie żądań przerwań oraz odblokowuje ich obsługę w kontrolerze
+NVIC.
     
     void PIT_Init(void) {
         SIM->SCGC6 |= SIM_SCGC6_PIT_MASK;
@@ -73,7 +78,9 @@ Funkcja konfiguruje licznik okresowy PIT do pełnienia roli systemowej podstawy 
     }
 
 ### 5.2 Przerwanie licznika (`PIT_IRQHandler`)
-Procedura obsługi przerwania licznika PIT, wywoływana cyklicznie co 1 ms. Inkrementuje globalną zmienną `timer_ms`.
+Procedura obsługi przerwania licznika PIT, wywoływana cyklicznie co 1 ms. Funkcja zatwierdza wystąpienie przerwania
+poprzez wyzerowanie odpowiedniej flagi sprzętowej oraz inkrementuje globalną zmienną timer_ms, która służy do
+bieżącego odmierzania czasu w systemie.
     
     void PIT_IRQHandler(void) {
         if (PIT->CHANNEL[0].TFLG & PIT_TFLG_TIF_MASK) {
@@ -83,7 +90,8 @@ Procedura obsługi przerwania licznika PIT, wywoływana cyklicznie co 1 ms. Inkr
     }
 
 ### 5.3 Przerwanie ADC (`ADC0_IRQHandler`)
-Uruchamiana automatycznie po zakończeniu każdego pomiaru. Pobiera surowy wynik konwersji i przekazuje do zmiennych programu.
+Procedura obsługi przerwania przetwornika analogowo cyfrowego, uruchamiana automatycznie po zakończeniu  każdego pomiaru. Funkcja pobiera surowy wynik konwersji z rejestru sprzętowego i przekazuje go do zmiennych programu, sygnalizując pętli głównej gotowość nowych danych o aktualnym natężeniu oświetlenia.
+
     
     void ADC0_IRQHandler() {
         temp = ADC0->R[0];
@@ -94,7 +102,7 @@ Uruchamiana automatycznie po zakończeniu każdego pomiaru. Pobiera surowy wynik
     }
 
 ### 5.4 Dekodowanie znaku (`dekoduj_znak`)
-Realizuje translację odebranej sekwencji kropek i kresek na znaki alfanumeryczne, porównując bufor ze słownikiem kodów Morse'a.
+Funkcja realizuje translację odebranej sekwencji kropek i kresek na znaki alfanumeryczne. Algorytm porównuje zawartość bufora wejściowego ze  zdefiniowanym słownikiem kodu Morse'a i zwraca odpowiadający mu symbol ASCII lub znak zapytania, jeśli sekwencja nie została rozpoznana.
     
     char dekoduj_znak(char* kod) {
         if (strcmp(kod, ".-") == 0) return 'A';
@@ -107,7 +115,7 @@ Realizuje translację odebranej sekwencji kropek i kresek na znaki alfanumeryczn
     }
 
 ### 5.5 Kalibracja tła (`kalibracja`)
-Adaptuje układ do oświetlenia otoczenia. Weryfikuje stan nasycenia czujnika (> 2V) i rejestruje nowy punkt odniesienia dla detekcji sygnałów (`prog_tla`).
+Funkcja adaptuje układ do oświetlenia otoczenia. W pierwszej kolejności weryfikuje stan nasycenia czujnika (napięcie > 2V). W przypadku przekroczenia tego progu blokuje dalsze działanie programu i wyświetla komunikat błędu, który nie znika, dopóki warunki nie ulegną poprawie. Jeżeli natomiast pomiar mieści się w normie, funkcja rejestruje aktualnie zmierzone napięcie jako zmienną prog_tla, ustanawiając tym samym nowy punkt odniesienia dla detekcji sygnałów. 
     
     void kalibracja(void) {
         while (!wynik_ok);
@@ -128,7 +136,7 @@ Adaptuje układ do oświetlenia otoczenia. Weryfikuje stan nasycenia czujnika (>
     }
 
 ### 5.6 Pomiar impulsu (`measure_high`)
-Mierzy czas trwania aktywnego impulsu świetlnego. Posiada wbudowane zabezpieczenie timeout przerywające pomiar po 5 jednostkach czasu.
+Funkcja realizuje pomiar czasu trwania aktywnego impulsu świetlnego. Po zarejestrowaniu momentu początkowego pętla monitoruje sygnał wejściowy aż do spadku napięcia poniżej progu detekcji (z uwzględnieniem histerezy). Procedura wyposażona jest w zabezpieczenie typu timeout – jeżeli stan wysoki utrzymuje się zbyt długo (powyżej 5 jednostek czasu), system przerywa pomiar i wymusza ponowną kalibrację tła.
     
     void measure_high(void) {
         int start = timer_ms;
@@ -148,7 +156,7 @@ Mierzy czas trwania aktywnego impulsu świetlnego. Posiada wbudowane zabezpiecze
     }
 
 ### 5.7 Pomiar przerwy (`measure_low`)
-Realizuje pomiar czasu trwania przerwy między impulsami (stanu niskiego). Jeśli stan niski utrzymuje się zbyt długo, wywołuje kalibrację i adaptuje system do spoczynku.
+Funkcja realizuje pomiar czasu trwania przerwy między impulsami (stanu niskiego). Po zarejestrowaniu momentu początkowego pętla monitoruje sygnał wejściowy aż do wzrostu napięcia powyżej progu detekcji z uwzględnieniem histerezy (sygnalizującego nadejście kolejnego błysku). Jeżeli stan niski utrzymuje się dłużej niż założony limit (ok. 3 jednostki czasu), system przerywa oczekiwanie i wywołuje kalibrację tła, adaptując się do warunków spoczynkowych.
     
     void measure_low(void) {
         int start = timer_ms;
